@@ -28,7 +28,22 @@ export class PayPalError extends Error {
   }
 }
 
-export async function pp<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+export async function pp<T = unknown>(path: string, init: { method?: string; body?: unknown } = {}, retry = true): Promise<T> {
+  const method = init.method ?? 'GET';
+  try {
+    return await request<T>(path, init);
+  } catch (e) {
+    // Sandbox occasionally answers a read with an empty or non-JSON body or a 5xx. Reads are safe to retry once.
+    const transient = !(e instanceof PayPalError) || e.status >= 500;
+    if (retry && method === 'GET' && transient) {
+      await new Promise((r) => setTimeout(r, 400));
+      return pp<T>(path, init, false);
+    }
+    throw e;
+  }
+}
+
+async function request<T>(path: string, init: { method?: string; body?: unknown }): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: init.method ?? 'GET',
     headers: {
@@ -40,7 +55,12 @@ export async function pp<T = unknown>(path: string, init: { method?: string; bod
     cache: 'no-store',
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : {};
+  let data: unknown = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new PayPalError(res.status >= 400 ? res.status : 502, { message: `Non-JSON response: ${text.slice(0, 200)}` });
+  }
   if (!res.ok) throw new PayPalError(res.status, data);
   return data as T;
 }

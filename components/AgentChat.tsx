@@ -9,6 +9,7 @@ const PROMPTS = [
   'Send a reminder to everyone more than 7 days late.',
   'Which invoices has the customer never opened?',
   'Any open PayPal disputes?',
+  'How much revenue did we earn this month, and how much is deferred?',
 ];
 
 type AnyToolPart = ToolUIPart | DynamicToolUIPart;

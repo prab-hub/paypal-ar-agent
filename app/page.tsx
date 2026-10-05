@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import NewInvoice from '@/components/NewInvoice';
 import Ledger from '@/components/Ledger';
 import AgentChat from '@/components/AgentChat';
+import RevRec from '@/components/RevRec';
 import type { LedgerRow, summarize } from '@/lib/ar';
 
 export default function Home() {
@@ -35,7 +36,7 @@ export default function Home() {
     <main className="mx-auto w-full max-w-7xl px-4 py-8">
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Settle</h1>
-        <p className="text-gray-600">AI accounts receivable on PayPal: quote to invoice, collections, and an agent that knows who owes what.</p>
+        <p className="text-gray-600">AI accounts receivable on PayPal: quote to invoice, collections, revenue recognition, and an agent that knows who owes what.</p>
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </header>
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
@@ -44,6 +45,9 @@ export default function Home() {
           <Ledger rows={rows} summary={summary} loading={loading} onRefresh={refresh} />
         </div>
         <AgentChat onAction={refresh} />
+      </div>
+      <div className="mt-6">
+        <RevRec />
       </div>
     </main>
   );

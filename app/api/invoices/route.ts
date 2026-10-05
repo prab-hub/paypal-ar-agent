@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { createInvoice, listInvoices, PayPalError, sendInvoice } from '@/lib/paypal';
+import { createInvoice, deleteInvoice, listInvoices, PayPalError, sendInvoice } from '@/lib/paypal';
 import { summarize, toRow } from '@/lib/ar';
 
 export async function GET() {
@@ -61,7 +61,16 @@ export async function POST(req: Request) {
         unit_amount: { currency_code: d.currency.toUpperCase(), value: i.unit_price.toFixed(2) },
       })),
     });
-    if (d.send) await sendInvoice(inv.id);
+    if (d.send) {
+      try {
+        await sendInvoice(inv.id);
+      } catch (e) {
+        // Don't leave a half-done draft behind when PayPal refuses to send (e.g. recipients in India are blocked).
+        await deleteInvoice(inv.id).catch(() => {});
+        const issue = e instanceof PayPalError ? (e.body as { details?: { description?: string }[] }).details?.[0]?.description : '';
+        return Response.json({ error: `PayPal would not send this invoice. ${issue || (e as Error).message}` }, { status: 422 });
+      }
+    }
     return Response.json({ id: inv.id, number: inv.detail.invoice_number, sent: d.send });
   } catch (e) {
     const status = e instanceof PayPalError ? 422 : 502;
