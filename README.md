@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Settle: AI accounts receivable on PayPal
 
-## Getting Started
+Small businesses wait weeks to get paid because invoicing and chasing are manual. Settle runs the
+quote-to-cash loop on PayPal with AI doing the busywork and a human approving anything that touches money.
 
-First, run the development server:
+1. **Quote to invoice.** Paste a scope, quote, PO or email thread. AI extracts the customer, line items, terms
+   and PO reference, flags anything ambiguous, and you create and send a PayPal invoice in one click.
+2. **Receivables.** A live ledger of every PayPal invoice: balance, due date, days late, collection stage, and
+   whether the customer has opened it.
+3. **Collections.** Click a late invoice and AI drafts a reminder whose tone escalates with lateness
+   (friendly, neutral, firm, final) and adapts to partial payments and unopened invoices. Edit, then send it
+   through PayPal's reminder API.
+4. **AR agent.** Ask "who owes me money?" or "remind everyone more than 7 days late". The agent uses the
+   PayPal Agent Toolkit to read invoices, transactions and disputes. Any write (send, remind, record payment,
+   cancel) pauses for your approval, and approvals are signed server-side.
 
-```bash
+## PayPal and AI used
+
+| Piece | Where |
+|---|---|
+| PayPal Invoicing API v2 (create, send, remind, list) | `lib/paypal.ts` |
+| PayPal Agent Toolkit (`@paypal/agent-toolkit`): invoices, transactions, insights, disputes, orders | `lib/agent-tools.ts`, `app/api/agent` |
+| AI SDK 7 structured output for extraction and reminders | `lib/extract.ts`, `lib/reminder.ts` |
+| AI SDK 7 tool loop with human approval | `app/api/agent/route.ts`, `components/AgentChat.tsx` |
+| AG Grid receivables ledger | `components/Ledger.tsx` |
+
+The toolkit's AI SDK adapter targets AI SDK v4; `lib/agent-tools.ts` re-wraps its tools for v7.
+
+## Run it
+
+```
+cp .env.example .env.local   # add PayPal sandbox client id/secret and an OpenAI key
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Sandbox buyers: create Personal accounts under Testing Tools > Sandbox Accounts and use their emails as
+customers. Log in at sandbox.paypal.com as the buyer to pay an invoice.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## License
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
