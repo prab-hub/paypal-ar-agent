@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { createInvoice, deleteInvoice, listInvoices, PayPalError, sendInvoice } from '@/lib/paypal';
 import { summarize, toRow } from '@/lib/ar';
+import { limit } from '@/lib/ratelimit';
 
 export async function GET() {
   try {
@@ -32,6 +33,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = limit(req);
+  if (limited) return limited;
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) {
     return Response.json({ error: parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ') }, { status: 400 });

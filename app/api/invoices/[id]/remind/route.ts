@@ -1,11 +1,14 @@
 import { z } from 'zod';
 import { getInvoice, remindInvoice } from '@/lib/paypal';
 import { draftReminder } from '@/lib/reminder';
+import { limit } from '@/lib/ratelimit';
 
 export const maxDuration = 60;
 
 // GET: AI drafts a reminder for review. POST: sends the (possibly edited) reminder through PayPal.
 export async function GET(req: Request, ctx: RouteContext<'/api/invoices/[id]/remind'>) {
+  const limited = limit(req);
+  if (limited) return limited;
   const { id } = await ctx.params;
   const context = new URL(req.url).searchParams.get('context') ?? '';
   try {
@@ -18,6 +21,8 @@ export async function GET(req: Request, ctx: RouteContext<'/api/invoices/[id]/re
 const Body = z.object({ subject: z.string().min(1).max(200), note: z.string().min(1).max(4000) });
 
 export async function POST(req: Request, ctx: RouteContext<'/api/invoices/[id]/remind'>) {
+  const limited = limit(req);
+  if (limited) return limited;
   const { id } = await ctx.params;
   const parsed = Body.safeParse(await req.json());
   if (!parsed.success) return Response.json({ error: 'Subject and note are required' }, { status: 400 });

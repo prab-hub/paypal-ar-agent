@@ -37,6 +37,11 @@ export default function Home() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold">Settle</h1>
         <p className="text-gray-600">AI accounts receivable on PayPal: quote to invoice, collections, revenue recognition, and an agent that knows who owes what.</p>
+        <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Live demo on the <b>PayPal sandbox</b>: no real money moves and no real emails are sent. Use a sandbox buyer
+          as the customer, e.g. <code className="font-mono">sb-wx9uk53193568@personal.example.com</code>. Anything
+          that changes an invoice asks for your approval first.
+        </p>
         {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
       </header>
       <div className="grid gap-6 lg:grid-cols-[1fr_420px]">

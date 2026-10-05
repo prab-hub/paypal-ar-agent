@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { paypalTools, READ_ONLY } from '@/lib/agent-tools';
 import { buildRevRecInputs } from '@/lib/revrec-classify';
 import { waterfall } from '@/lib/revrec';
+import { limit } from '@/lib/ratelimit';
 
 // Our own read-only tool next to the PayPal toolkit: the ASC 606 schedule built from live invoices.
 const revenueSchedule = tool({
@@ -52,6 +53,8 @@ How to work:
 - Keep answers short and concrete. Use plain text or simple lists. Never use em dashes.`;
 
 export async function POST(req: Request) {
+  const limited = limit(req);
+  if (limited) return limited;
   const { messages }: { messages: UIMessage[] } = await req.json();
   const result = streamText({
     model,
