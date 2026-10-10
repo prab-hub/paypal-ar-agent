@@ -1,6 +1,6 @@
 # Settle: AI accounts receivable on PayPal
 
-**Live demo:** https://settle-paypal.vercel.app (PayPal sandbox, no real money)
+**Live demo:** https://paypalsettle.revexos.com (PayPal sandbox, no real money)
 
 Small businesses wait weeks to get paid because invoicing, chasing and matching payments are manual. Settle runs
 the quote-to-cash loop on PayPal with AI doing the busywork and a human approving anything that touches money.
