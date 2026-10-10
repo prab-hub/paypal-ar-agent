@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { createInvoice, deleteInvoice, listInvoices, PayPalError, sendInvoice } from '@/lib/paypal';
 import { summarize, toRow } from '@/lib/ar';
 import { limit } from '@/lib/ratelimit';
+import { remindedMap } from '@/lib/reminded';
 
 export async function GET() {
   try {
-    const rows = (await listInvoices()).map((i) => toRow(i));
-    return Response.json({ rows, summary: summarize(rows) });
+    const rows = (await listInvoices()).filter((i) => i.status !== 'CANCELLED').map((i) => toRow(i));
+    return Response.json({ rows, summary: summarize(rows), reminded: remindedMap() });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });
   }

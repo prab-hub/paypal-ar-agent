@@ -83,8 +83,11 @@ export type PPInvoice = {
   items?: { name: string; description?: string; quantity: string; unit_amount: Money }[];
   amount?: Money;
   due_amount?: Money;
-  payments?: { paid_amount?: Money; transactions?: { payment_id?: string; method?: string; date?: string; amount?: Money; note?: string }[] };
+  payments?: { paid_amount?: Money; transactions?: PPPayment[] };
 };
+
+// type is EXTERNAL for payments recorded by the merchant (cash, bank transfer) and PAYPAL for checkout payments.
+export type PPPayment = { type?: string; payment_id?: string; transaction_id?: string; method?: string; payment_date?: string; amount?: Money; note?: string };
 
 export async function listInvoices(): Promise<PPInvoice[]> {
   const out: PPInvoice[] = [];
@@ -123,3 +126,135 @@ export const remindInvoice = (id: string, subject: string, note: string) =>
 
 export const deleteInvoice = (id: string) =>
   pp(`/v2/invoicing/invoices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+
+export const cancelInvoice = (id: string) =>
+  pp(`/v2/invoicing/invoices/${encodeURIComponent(id)}/cancel`, {
+    method: 'POST',
+    body: { send_to_recipient: false, send_to_invoicer: false },
+  });
+
+// send_to_recipient: false still moves the invoice to UNPAID without emailing anyone (used by the demo seed).
+export const sendInvoiceSilently = (id: string) =>
+  pp(`/v2/invoicing/invoices/${encodeURIComponent(id)}/send`, { method: 'POST', body: { send_to_recipient: false, send_to_invoicer: false } });
+
+export const recordPayment = (id: string, p: { method: string; date: string; amount: Money; note?: string }) =>
+  pp<{ payment_id: string }>(`/v2/invoicing/invoices/${encodeURIComponent(id)}/payments`, {
+    method: 'POST',
+    body: { method: p.method, payment_date: p.date, amount: p.amount, ...(p.note ? { note: p.note } : {}) },
+  });
+
+export const deletePayment = (id: string, paymentId: string) =>
+  pp(`/v2/invoicing/invoices/${encodeURIComponent(id)}/payments/${encodeURIComponent(paymentId)}`, { method: 'DELETE' });
+
+// A PayPal checkout payment's capture carries the fee and net amount.
+export type PPCapture = {
+  id: string;
+  status: string;
+  amount: Money;
+  seller_receivable_breakdown?: { gross_amount: Money; paypal_fee?: Money; net_amount?: Money };
+};
+export const getCapture = (id: string) => pp<PPCapture>(`/v2/payments/captures/${encodeURIComponent(id)}`);
+
+// Transaction Search must be enabled on the REST app; until then PayPal answers 403 NOT_AUTHORIZED.
+export type PPTransaction = {
+  transaction_info: {
+    transaction_id: string;
+    transaction_event_code?: string;
+    transaction_initiation_date?: string;
+    transaction_amount?: Money;
+    fee_amount?: Money;
+    invoice_id?: string;
+    transaction_status?: string;
+  };
+  payer_info?: { email_address?: string; payer_name?: { alternate_full_name?: string } };
+};
+export async function listTransactions(days = 31): Promise<PPTransaction[]> {
+  const end = new Date();
+  const start = new Date(end.getTime() - Math.min(days, 31) * 86_400_000);
+  const fmt = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, '-0000');
+  const d = await pp<{ transaction_details?: PPTransaction[] }>(
+    `/v1/reporting/transactions?start_date=${fmt(start)}&end_date=${fmt(end)}&fields=transaction_info,payer_info&page_size=500`,
+  );
+  return d.transaction_details ?? [];
+}
+
+// Disputes (customer disputes API). The toolkit can list, get and accept; evidence goes through REST.
+export type PPDispute = {
+  dispute_id: string;
+  reason?: string;
+  status?: string;
+  dispute_state?: string;
+  dispute_amount?: Money;
+  create_time?: string;
+  update_time?: string;
+  dispute_life_cycle_stage?: string;
+  seller_response_due_date?: string;
+  disputed_transactions?: {
+    seller_transaction_id?: string;
+    buyer_transaction_id?: string;
+    invoice_number?: string;
+    gross_amount?: Money;
+    buyer?: { name?: string; email?: string };
+    items?: { item_name?: string; item_description?: string }[];
+  }[];
+  messages?: { posted_by?: string; time_posted?: string; content?: string }[];
+  offer?: unknown;
+  links?: { rel: string; href: string; method: string }[];
+};
+
+export async function listDisputes(): Promise<PPDispute[]> {
+  const d = await pp<{ items?: PPDispute[] }>('/v1/customer/disputes?page_size=50');
+  return d.items ?? [];
+}
+export const getDispute = (id: string) => pp<PPDispute>(`/v1/customer/disputes/${encodeURIComponent(id)}`);
+
+export const acceptClaim = (id: string, note: string) =>
+  pp(`/v1/customer/disputes/${encodeURIComponent(id)}/accept-claim`, { method: 'POST', body: { note } });
+
+export const sendDisputeMessage = (id: string, message: string) =>
+  pp(`/v1/customer/disputes/${encodeURIComponent(id)}/send-message`, { method: 'POST', body: { message } });
+
+// provide-evidence is multipart: a JSON "input" part, with optional files. We send notes only (no files).
+export async function provideEvidence(id: string, evidence: { evidence_type: string; notes: string }[]) {
+  const form = new FormData();
+  form.append(
+    'input',
+    new Blob([JSON.stringify({ evidences: evidence.map((e) => ({ evidence_type: e.evidence_type, notes: e.notes })) })], {
+      type: 'application/json',
+    }),
+  );
+  const res = await fetch(`${BASE}/v1/customer/disputes/${encodeURIComponent(id)}/provide-evidence`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${await token()}` },
+    body: form,
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  if (!res.ok) throw new PayPalError(res.status, text ? JSON.parse(text) : {});
+  return text ? JSON.parse(text) : {};
+}
+
+// Webhook signature check: PayPal verifies its own headers against the webhook id we registered.
+export async function verifyWebhook(headers: Headers, event: unknown): Promise<boolean> {
+  const webhookId = process.env.PAYPAL_WEBHOOK_ID;
+  if (!webhookId) return false;
+  const d = await pp<{ verification_status?: string }>('/v1/notifications/verify-webhook-signature', {
+    method: 'POST',
+    body: {
+      auth_algo: headers.get('paypal-auth-algo'),
+      cert_url: headers.get('paypal-cert-url'),
+      transmission_id: headers.get('paypal-transmission-id'),
+      transmission_sig: headers.get('paypal-transmission-sig'),
+      transmission_time: headers.get('paypal-transmission-time'),
+      webhook_id: webhookId,
+      webhook_event: event,
+    },
+  });
+  return d.verification_status === 'SUCCESS';
+}
+
+export const makeOffer = (id: string, note: string, amount: Money) =>
+  pp(`/v1/customer/disputes/${encodeURIComponent(id)}/make-offer`, {
+    method: 'POST',
+    body: { note, offer_amount: amount, offer_type: 'REFUND' },
+  });

@@ -54,16 +54,16 @@ export default function NewInvoice({ onCreated }: { onCreated: () => void }) {
   const busy = status.kind === 'busy';
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-baseline justify-between">
-        <h2 className="text-lg font-semibold">1. Quote to invoice</h2>
+        <h2 className="text-lg font-semibold">Quote to invoice</h2>
         {!draft && (
           <button className="text-sm text-blue-700 hover:underline" onClick={() => setText(SAMPLE)}>
             Use sample
           </button>
         )}
       </div>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-slate-600">
         Paste a scope, quote, PO or email thread. AI drafts the invoice; you check it; PayPal sends it.
       </p>
 
@@ -124,7 +124,7 @@ export default function NewInvoice({ onCreated }: { onCreated: () => void }) {
             </label>
           </div>
           <table className="w-full">
-            <thead className="text-left text-gray-500">
+            <thead className="text-left text-slate-500">
               <tr>
                 <th className="py-1">Item</th>
                 <th className="w-20">Qty</th>
@@ -166,14 +166,14 @@ export default function NewInvoice({ onCreated }: { onCreated: () => void }) {
             <button className="rounded-lg border px-4 py-2 disabled:opacity-50" disabled={busy} onClick={() => create(false)}>
               Save as draft
             </button>
-            <button className="px-2 text-gray-500" disabled={busy} onClick={() => setDraft(null)}>
+            <button className="px-2 text-slate-500" disabled={busy} onClick={() => setDraft(null)}>
               Back
             </button>
           </div>
         </div>
       )}
       {status.msg && (
-        <p className={`mt-3 text-sm ${status.kind === 'error' ? 'text-red-700' : status.kind === 'done' ? 'text-green-700' : 'text-gray-600'}`}>
+        <p className={`mt-3 text-sm ${status.kind === 'error' ? 'text-red-700' : status.kind === 'done' ? 'text-green-700' : 'text-slate-600'}`}>
           {status.msg}
         </p>
       )}

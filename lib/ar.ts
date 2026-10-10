@@ -33,6 +33,7 @@ export type LedgerRow = {
   daysOverdue: number | null;
   stage: string;
   viewed: boolean;
+  memo: string;
 };
 
 const OPEN = new Set(['SENT', 'UNPAID', 'PARTIALLY_PAID', 'SCHEDULED']);
@@ -66,18 +67,75 @@ export function toRow(inv: PPInvoice, now = new Date()): LedgerRow {
     daysOverdue,
     stage: stageFor(daysOverdue)?.label ?? '',
     viewed: !!inv.detail.viewed_by_recipient,
+    memo: inv.detail.memo ?? '',
   };
 }
 
-export function summarize(rows: LedgerRow[]) {
+// Standard AR aging buckets by days past due. Not-yet-due balances sit in Current.
+export const AGING = [
+  { label: 'Current', min: -Infinity, max: 0 },
+  { label: '1-30', min: 1, max: 30 },
+  { label: '31-60', min: 31, max: 60 },
+  { label: '61-90', min: 61, max: 90 },
+  { label: '90+', min: 91, max: Infinity },
+] as const;
+
+export function summarize(rows: LedgerRow[], now = new Date()) {
   const open = rows.filter((r) => r.balance > 0);
   const overdue = open.filter((r) => (r.daysOverdue ?? -1) > 0);
   const sum = (xs: LedgerRow[]) => +xs.reduce((s, r) => s + r.balance, 0).toFixed(2);
+  const aging = AGING.map((b) => {
+    const xs = open.filter((r) => {
+      const d = r.daysOverdue ?? 0;
+      return d >= b.min && d <= b.max;
+    });
+    return { label: b.label, count: xs.length, amount: sum(xs) };
+  });
+  // DSO, the standard way: receivables now / credit sales over the last 90 days x 90.
+  // Only one currency is meaningful; mixed-currency ledgers use the most common one.
+  const live = rows.filter((r) => r.status !== 'DRAFT' && r.status !== 'CANCELLED');
+  const cur = mode(live.map((r) => r.currency)) ?? 'USD';
+  const billed90 = live
+    .filter((r) => r.currency === cur && r.invoiceDate && daysBetween(r.invoiceDate, now) <= 90)
+    .reduce((s, r) => s + r.total, 0);
+  const ar = open.filter((r) => r.currency === cur).reduce((s, r) => s + r.balance, 0);
   return {
+    currency: cur,
     openCount: open.length,
     openAmount: sum(open),
     overdueCount: overdue.length,
     overdueAmount: sum(overdue),
     paidCount: rows.filter((r) => r.status === 'PAID' || r.status === 'MARKED_AS_PAID').length,
+    aging,
+    dso: billed90 > 0 ? Math.round((ar / billed90) * 90) : null,
   };
+}
+
+function mode(xs: string[]): string | undefined {
+  const c = new Map<string, number>();
+  xs.forEach((x) => c.set(x, (c.get(x) ?? 0) + 1));
+  return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+}
+
+// Collections queue: which open invoices should get a reminder today, highest priority first.
+// Rule: due within 3 days or overdue, and not reminded in the last 5 days. Priority weighs the balance by lateness,
+// and an invoice the customer never opened ranks higher (it was probably missed, so a nudge works best).
+export const REMIND_EVERY_DAYS = 5;
+
+export type QueueItem = { row: LedgerRow; priority: number; why: string };
+
+export function collectionsQueue(rows: LedgerRow[], reminded: Record<string, string>, now = new Date()): QueueItem[] {
+  return rows
+    .filter((r) => r.balance > 0 && r.daysOverdue !== null && r.daysOverdue >= -3)
+    .filter((r) => !reminded[r.id] || daysBetween(reminded[r.id].slice(0, 10), now) >= REMIND_EVERY_DAYS)
+    .map((r) => {
+      const late = Math.max(0, r.daysOverdue ?? 0);
+      const priority = Math.round(r.balance * (1 + late / 30) * (r.viewed ? 1 : 1.2));
+      const why =
+        (r.daysOverdue ?? 0) < 0 ? `Due in ${-(r.daysOverdue ?? 0)} days: friendly heads-up` :
+        r.daysOverdue === 0 ? 'Due today' :
+        `${late} days late, stage ${r.stage}` + (r.paid > 0 ? ', partly paid' : '') + (r.viewed ? '' : ', never opened');
+      return { row: r, priority, why };
+    })
+    .sort((a, b) => b.priority - a.priority);
 }

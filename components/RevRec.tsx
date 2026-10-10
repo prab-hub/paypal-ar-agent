@@ -73,9 +73,9 @@ export default function RevRec() {
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5">
+    <section className="rounded-xl border border-slate-200 bg-white p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold">4. Revenue recognition</h2>
+        <h2 className="text-lg font-semibold">Revenue recognition</h2>
         <div className="flex gap-3 text-sm">
           {data && (
             <button className="text-blue-700 hover:underline" onClick={download}>
@@ -87,7 +87,7 @@ export default function RevRec() {
           </button>
         </div>
       </div>
-      <p className="mt-1 text-sm text-gray-600">
+      <p className="mt-1 text-sm text-slate-600">
         ASC 606 / IFRS 15: revenue follows delivery, not the invoice or the payment. AI reads each PayPal invoice line and
         decides whether it is earned at a point in time or over a service period; you can change any line. Full months
         get equal amounts, partial months are split by their days.
@@ -103,10 +103,10 @@ export default function RevRec() {
               ['Unbilled revenue now', now?.unbilled ?? 0],
               ['Collected to date', rows.filter((r) => r.month <= thisMonth).reduce((s, r) => s + r.collected, 0)],
             ].map(([k, v]) => (
-              <div key={k} className="rounded-lg bg-gray-50 p-3">
-                <div className="text-xs text-gray-500">{k}</div>
+              <div key={k} className="rounded-lg bg-slate-50 p-3">
+                <div className="text-xs text-slate-500">{k}</div>
                 <div className="text-xl font-semibold tabular-nums">
-                  {money(v as number)} <span className="text-xs font-normal text-gray-500">{currency}</span>
+                  {money(v as number)} <span className="text-xs font-normal text-slate-500">{currency}</span>
                 </div>
               </div>
             ))}
@@ -128,7 +128,7 @@ export default function RevRec() {
           <h3 className="mt-5 text-sm font-semibold">Monthly waterfall ({currency})</h3>
           <div className="mt-2 overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm tabular-nums">
-              <thead className="text-left text-gray-500">
+              <thead className="text-left text-slate-500">
                 <tr>
                   <th className="py-1">Month</th>
                   <th className="text-right">Billed</th>
@@ -152,7 +152,7 @@ export default function RevRec() {
               </tbody>
             </table>
           </div>
-          <p className="mt-2 text-xs text-gray-500">
+          <p className="mt-2 text-xs text-slate-500">
             Deferred revenue is billed ahead of delivery (a liability). Unbilled revenue is delivered but not yet invoiced (a
             contract asset). Billed excludes tax. Drafts and cancelled invoices are left out.
             {data.skipped.length > 0 && ` Other currencies not included: ${data.skipped.join(', ')}.`}

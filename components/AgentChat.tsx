@@ -6,10 +6,12 @@ import { useState } from 'react';
 
 const PROMPTS = [
   'Who owes me money? Oldest first.',
-  'Send a reminder to everyone more than 7 days late.',
-  'Which invoices has the customer never opened?',
-  'Any open PayPal disputes?',
+  'Who should I chase today, and why?',
+  'Send a reminder to everyone more than 14 days late.',
+  'Any short pays or PayPal fees I should know about?',
+  'What is our DSO and how does the aging look?',
   'How much revenue did we earn this month, and how much is deferred?',
+  'Any open PayPal disputes?',
 ];
 
 type AnyToolPart = ToolUIPart | DynamicToolUIPart;
@@ -39,7 +41,7 @@ function ToolCard({ part, onApprove }: { part: AnyToolPart; onApprove: (id: stri
     part.state === 'output-denied' ? 'denied' :
     part.state === 'approval-responded' ? (part.approval.approved ? 'approved' : 'denied') : 'running...';
   return (
-    <details className="rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs text-gray-600">
+    <details className="rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
       <summary>
         PayPal: {name} ({label})
       </summary>
@@ -65,16 +67,16 @@ export default function AgentChat({ onAction }: { onAction: () => void }) {
   };
 
   return (
-    <section className="flex flex-col rounded-xl border border-gray-200 bg-white p-5">
-      <h2 className="text-lg font-semibold">3. AR agent</h2>
-      <p className="mt-1 text-sm text-gray-600">
+    <section className="flex max-h-[calc(100vh-2rem)] flex-col rounded-xl border border-slate-200 bg-white p-5 lg:sticky lg:top-4">
+      <h2 className="text-lg font-semibold">AR agent</h2>
+      <p className="mt-1 text-sm text-slate-600">
         Ask in plain English. It reads PayPal through the PayPal Agent Toolkit and asks before it changes anything.
       </p>
       <div className="mt-3 flex min-h-64 flex-1 flex-col gap-3 overflow-y-auto">
         {messages.length === 0 && (
           <div className="flex flex-wrap gap-2">
             {PROMPTS.map((p) => (
-              <button key={p} className="rounded-full border px-3 py-1 text-sm hover:bg-gray-50" onClick={() => ask(p)}>
+              <button key={p} className="rounded-full border border-slate-300 px-3 py-1 text-left text-sm hover:bg-slate-50" onClick={() => ask(p)}>
                 {p}
               </button>
             ))}
@@ -85,7 +87,7 @@ export default function AgentChat({ onAction }: { onAction: () => void }) {
             {m.parts.map((part, i) => {
               if (part.type === 'text')
                 return (
-                  <div key={i} className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${m.role === 'user' ? 'bg-blue-700 text-white' : 'bg-gray-100'}`}>
+                  <div key={i} className={`whitespace-pre-wrap rounded-lg px-3 py-2 text-sm ${m.role === 'user' ? 'bg-blue-700 text-white' : 'bg-slate-100'}`}>
                     {part.text}
                   </div>
                 );
@@ -99,7 +101,7 @@ export default function AgentChat({ onAction }: { onAction: () => void }) {
             })}
           </div>
         ))}
-        {busy && <div className="text-sm text-gray-500">Working...</div>}
+        {busy && <div className="text-sm text-slate-500">Working...</div>}
         {error && <div className="text-sm text-red-700">{error.message}</div>}
       </div>
       <form

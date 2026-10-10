@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getInvoice, remindInvoice } from '@/lib/paypal';
 import { draftReminder } from '@/lib/reminder';
 import { limit } from '@/lib/ratelimit';
+import { markReminded } from '@/lib/reminded';
 
 export const maxDuration = 60;
 
@@ -28,6 +29,7 @@ export async function POST(req: Request, ctx: RouteContext<'/api/invoices/[id]/r
   if (!parsed.success) return Response.json({ error: 'Subject and note are required' }, { status: 400 });
   try {
     await remindInvoice(id, parsed.data.subject, parsed.data.note);
+    markReminded(id);
     return Response.json({ ok: true });
   } catch (e) {
     return Response.json({ error: (e as Error).message }, { status: 502 });

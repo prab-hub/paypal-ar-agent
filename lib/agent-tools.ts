@@ -4,6 +4,7 @@
 import 'server-only';
 import { PayPalAgentToolkit } from '@paypal/agent-toolkit/ai-sdk';
 import { tool, type ToolSet } from 'ai';
+import { markReminded } from './reminded';
 
 const ACTIONS = {
   invoices: {
@@ -41,7 +42,13 @@ export function paypalTools(): ToolSet {
     out[name] = tool({
       description: t.description,
       inputSchema: t.parameters,
-      execute: async (args: unknown) => t.execute(args),
+      execute: async (args: unknown) => {
+        const out = await t.execute(args);
+        // Keep the collections queue in step when the agent sends a reminder.
+        const id = (args as { invoice_id?: string })?.invoice_id;
+        if (name === 'send_invoice_reminder' && id) markReminded(id);
+        return out;
+      },
     });
   }
   return out;

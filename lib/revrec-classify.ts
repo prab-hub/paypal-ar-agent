@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { judgmentModel } from './model';
 import { getInvoice, listInvoices, type PPInvoice } from './paypal';
 import { toRow } from './ar';
+import { MOVED_PREFIX } from './reconcile';
 import type { CashEvent, Obligation } from './revrec';
 
 const RECOGNIZED_STATUSES = new Set(['SENT', 'UNPAID', 'PARTIALLY_PAID', 'PAID', 'MARKED_AS_PAID', 'SCHEDULED', 'PARTIALLY_REFUNDED']);
@@ -126,7 +127,8 @@ export async function buildRevRecInputs(): Promise<{ obligations: Obligation[]; 
     const total = (inv.items ?? []).reduce((s, it) => s + lineAmount(it), 0);
     billed.push({ date: inv.detail.invoice_date ?? '', amount: Math.round(total * 100) / 100, currency, invoiceNumber: num });
     for (const t of inv.payments?.transactions ?? []) {
-      if (t.amount && t.date) collected.push({ date: t.date.slice(0, 10), amount: Number(t.amount.value), currency, invoiceNumber: num });
+      if (t.note?.startsWith(MOVED_PREFIX)) continue; // a balance moved to another invoice, not cash
+      if (t.amount && t.payment_date) collected.push({ date: t.payment_date.slice(0, 10), amount: Number(t.amount.value), currency, invoiceNumber: num });
     }
   }
   return { obligations, billed, collected, skipped };
