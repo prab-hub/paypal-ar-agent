@@ -48,12 +48,15 @@ export type DisputeView = {
 
 const hasLink = (d: PPDispute, rel: string) => !!d.links?.some((l) => l.rel === rel);
 
-async function findInvoice(d: PPDispute): Promise<PPInvoice | null> {
+type InvoiceSummary = Awaited<ReturnType<typeof listInvoices>>[number];
+
+function matchInvoice(d: PPDispute, all: InvoiceSummary[]): InvoiceSummary | undefined {
   const tx = d.disputed_transactions?.[0];
-  if (!tx) return null;
-  const all = await listInvoices();
-  // Best match: same invoice number. Fallback: same buyer email and amount.
-  let hit = tx.invoice_number ? all.find((i) => i.detail.invoice_number === tx.invoice_number) : undefined;
+  if (!tx) return undefined;
+  // PayPal puts the invoice ID (INV2-...) in invoice_number for invoice payments; older or manual disputes may carry
+  // the human invoice number instead. Fallback: same buyer email and the invoice total equals the disputed amount.
+  const ref = tx.invoice_number;
+  let hit = ref ? all.find((i) => i.id === ref) ?? all.find((i) => i.detail.invoice_number === ref) : undefined;
   if (!hit && tx.buyer?.email) {
     const amt = Number(tx.gross_amount?.value ?? d.dispute_amount?.value ?? 0);
     hit = all.find(
@@ -62,6 +65,11 @@ async function findInvoice(d: PPDispute): Promise<PPInvoice | null> {
         Math.abs(Number(i.amount?.value ?? 0) - amt) < 0.01,
     );
   }
+  return hit;
+}
+
+async function findInvoice(d: PPDispute, all?: InvoiceSummary[]): Promise<PPInvoice | null> {
+  const hit = matchInvoice(d, all ?? (await listInvoices()));
   return hit ? getInvoice(hit.id) : null;
 }
 
@@ -131,6 +139,13 @@ export async function analyzeDispute(id: string): Promise<{ dispute: DisputeView
 
 export async function listDisputeViews(): Promise<DisputeView[]> {
   const items = await listDisputes();
-  // The list endpoint returns a summary; read each one for amounts, buyer and available actions.
-  return Promise.all(items.slice(0, 20).map(async (s) => view(await getDispute(s.dispute_id), null)));
+  if (items.length === 0) return [];
+  const all = await listInvoices();
+  // The list endpoint returns a summary; read each one for amounts, buyer, available actions and its invoice.
+  return Promise.all(
+    items.slice(0, 20).map(async (s) => {
+      const d = await getDispute(s.dispute_id);
+      return view(d, await findInvoice(d, all).catch(() => null));
+    }),
+  );
 }

@@ -6,7 +6,7 @@ import { toRow } from './ar';
 
 export type RecStatus = 'matched' | 'short_pay' | 'partial' | 'unapplied';
 
-export type RecPayment = { id: string; date: string; method: string; type: string; gross: number; fee: number | null; net: number | null; note: string };
+export type RecPayment = { id: string; date: string; method: string; type: string; gross: number; fee: number | null; net: number | null; note: string; held: boolean };
 
 export type RecRow = {
   invoiceId: string;
@@ -37,12 +37,19 @@ async function paymentsFor(inv: PPInvoice): Promise<RecPayment[]> {
       const gross = Number(t.amount?.value ?? 0);
       let fee: number | null = null;
       let net: number | null = null;
+      let held = false;
       // PayPal checkout payments have a capture with the fee; recorded cash/bank payments don't.
       if (t.type !== 'EXTERNAL' && t.payment_id) {
         try {
           const cap = await getCapture(t.payment_id);
-          fee = Number(cap.seller_receivable_breakdown?.paypal_fee?.value ?? 0);
-          net = Number(cap.seller_receivable_breakdown?.net_amount?.value ?? gross - fee);
+          const b = cap.seller_receivable_breakdown;
+          // A capture PayPal is holding (status PENDING, e.g. after a buyer complaint) has no fee breakdown yet:
+          // leave fee and net unknown instead of reporting a zero fee.
+          held = cap.status === 'PENDING';
+          if (b) {
+            fee = Number(b.paypal_fee?.value ?? 0);
+            net = Number(b.net_amount?.value ?? gross - fee);
+          }
         } catch {
           // Capture not readable (different id shape or permissions): show the gross only.
         }
@@ -56,6 +63,7 @@ async function paymentsFor(inv: PPInvoice): Promise<RecPayment[]> {
         fee,
         net: net ?? (t.type === 'EXTERNAL' ? gross : null),
         note: t.note ?? '',
+        held,
       };
     }),
   );
@@ -88,6 +96,10 @@ export async function reconcile(): Promise<{ rows: RecRow[]; transactionSearch: 
           : status === 'short_pay'
             ? `Paid ${received.toFixed(2)} of ${row.total.toFixed(2)}. The ${balance.toFixed(2)} gap looks like a bank or FX deduction: invoice the balance or write it off.`
             : `Partial payment: ${balance.toFixed(2)} still owed. Keep it in collections.`;
+      const heldAmount = r2(payments.filter((p) => p.held).reduce((s, p) => s + p.gross, 0));
+      const heldNote = heldAmount > 0
+        ? ` PayPal is holding ${heldAmount.toFixed(2)} of it while a buyer complaint is open; the fee shows once it is released.`
+        : '';
       return {
         invoiceId: inv.id,
         number: row.number,
@@ -99,7 +111,7 @@ export async function reconcile(): Promise<{ rows: RecRow[]; transactionSearch: 
         net: r2(received - fees),
         balance,
         status,
-        explanation,
+        explanation: explanation + heldNote,
         payments,
       };
     }),
@@ -128,7 +140,7 @@ export async function reconcile(): Promise<{ rows: RecRow[]; transactionSearch: 
         balance: 0,
         status: 'unapplied',
         explanation: 'Money received with no invoice attached. Match it to an open invoice or refund it.',
-        payments: [{ id: ti.transaction_id, date: (ti.transaction_initiation_date ?? '').slice(0, 10), method: 'PAYPAL', type: 'PAYPAL', gross: amount, fee, net: r2(amount - fee), note: '' }],
+        payments: [{ id: ti.transaction_id, date: (ti.transaction_initiation_date ?? '').slice(0, 10), method: 'PAYPAL', type: 'PAYPAL', gross: amount, fee, net: r2(amount - fee), note: '', held: false }],
       });
     }
   } catch (e) {

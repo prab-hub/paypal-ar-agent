@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { money } from '@/lib/format';
 
-type Payment = { id: string; date: string; method: string; type: string; gross: number; fee: number | null; net: number | null; note: string };
+type Payment = { id: string; date: string; method: string; type: string; gross: number; fee: number | null; net: number | null; note: string; held?: boolean };
 type Row = {
   invoiceId: string; number: string; customer: string; currency: string; total: number; received: number; fees: number; net: number;
   balance: number; status: 'matched' | 'short_pay' | 'partial' | 'unapplied'; explanation: string; payments: Payment[];
@@ -104,7 +104,7 @@ export default function Reconcile({ onChange }: { onChange: () => void }) {
                     </td>
                     <td className="text-right tabular-nums">{r.total ? money(r.total) : ''}</td>
                     <td className="text-right tabular-nums">{money(r.received)}</td>
-                    <td className="text-right tabular-nums">{r.fees ? money(r.fees) : '0.00'}</td>
+                    <td className="text-right tabular-nums">{r.fees ? money(r.fees) : r.payments.some((p) => p.held && p.fee === null) ? <span className="text-xs text-slate-500">pending</span> : '0.00'}</td>
                     <td className={`text-right tabular-nums ${r.balance ? 'font-semibold text-amber-700' : ''}`}>{money(r.balance)}</td>
                     <td className="max-w-72 pl-4">
                       <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${BADGE[r.status][1]}`}>{BADGE[r.status][0]}</span>

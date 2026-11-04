@@ -117,6 +117,11 @@ export default function Disputes() {
             <button className="flex w-full items-start justify-between gap-3 text-left" onClick={() => setOpen(open === d.id ? '' : d.id)}>
               <span>
                 <span className="font-medium">{d.reason.replaceAll('_', ' ').toLowerCase()}</span>
+                {d.invoice && (
+                  <span className="block text-sm text-slate-700">
+                    Invoice {d.invoice.number} · {d.invoice.customer}
+                  </span>
+                )}
                 <span className="block text-xs text-slate-500">
                   {d.buyer} · opened {d.created} · {d.status.replaceAll('_', ' ').toLowerCase()}
                   {d.respondBy && ` · respond by ${d.respondBy}`}
