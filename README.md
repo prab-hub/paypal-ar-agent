@@ -90,7 +90,7 @@ The toolkit's AI SDK adapter targets AI SDK v4; `lib/agent-tools.ts` re-wraps it
 ## Run it
 
 ```
-cp .env.example .env.local   # add PayPal sandbox client id/secret and an OpenAI key
+cp .env.example .env.local   # add PayPal sandbox client id/secret and an Anthropic API key
 npm install
 npm run dev
 ```
