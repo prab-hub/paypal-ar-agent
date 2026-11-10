@@ -87,6 +87,27 @@ card in the agent chat.
 
 The toolkit's AI SDK adapter targets AI SDK v4; `lib/agent-tools.ts` re-wraps its tools for v7.
 
+### AI models
+
+All AI runs on **Anthropic Claude** through the Vercel AI SDK 7 (`@ai-sdk/anthropic`):
+
+| Model | Used for | Why |
+|---|---|---|
+| Claude Haiku 5.5 (`claude-haiku-5-5`) | AR agent tool loop, quote/PO extraction, collection reminders | Fast and cheap for conversational and drafting work |
+| Claude Sonnet 5.5 (`claude-sonnet-5-5`) | Revenue recognition line classification, dispute review | Accounting judgment calls where a wrong answer costs money |
+
+Override with `ANTHROPIC_MODEL` and `ANTHROPIC_JUDGMENT_MODEL`. Extraction, reminders and dispute reviews use
+structured output with Zod schemas, so the UI never parses free text.
+
+### Other tools
+
+- **Next.js 16** (App Router) and **React**, written in **TypeScript**
+- **AG Grid** (sponsor) for the receivables ledger and the editable revenue grid
+- **Tailwind CSS** for styling
+- **Zod** for AI output and API schemas
+- **Vercel** for hosting (the live demo)
+- No database: PayPal is the system of record, read live through its APIs
+
 ## Run it
 
 ```
